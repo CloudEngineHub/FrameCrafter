@@ -16,6 +16,7 @@ output/
 demo_output/
 wandb/
 ckpt/
+models/
 
 .env
 .vscode/

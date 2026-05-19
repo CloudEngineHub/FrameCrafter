@@ -11,6 +11,12 @@ Carnegie Mellon University
 
 </div>
 
+## News
+
+- **[2026-05]** Training code released. See [Training](#training) for the
+  three-stage LoRA recipe used to produce the released checkpoint.
+- **[2026-04]** Inference code released.
+
 ## Overview
 We tackle the problem of sparse novel view synthesis (NVS) using video diffusion models: given *K* (≈ 5) multi-view images of a scene and their camera poses, we predict the view from a target camera pose. Many prior approaches leverage generative image priors encoded via diffusion models. However, models trained on single images lack multi-view knowledge. We instead argue that video models already contain implicit multi-view knowledge and so should be easier to adapt for NVS. Our key insight is to formulate sparse NVS as a low frame-rate video completion task. However, one challenge is that sparse NVS is defined over an unordered set of inputs, often too sparse to admit a meaningful order, so the models should be *invariant* to permutations of that input set. To this end, we present **FrameCrafter**, which adapts video models (naturally trained with coherent frame orderings) to permutation-invariant NVS through several architectural modifications, including per-frame latent encodings and removal of temporal positional embeddings. Our results suggest that video models can be easily trained to "forget" about time with minimal supervision, producing competitive performance on sparse-view NVS benchmarks.
 
@@ -177,6 +183,71 @@ Intrinsics are automatically scaled based on the input image dimensions.
 - **VRAM**: Set `--vram_limit` (in GB) to fit different GPUs. The model offloads weights to CPU when VRAM is limited. For example, use `--vram_limit 22` for a 24 GB card.
 - **Speed**: Reduce `--num_inference_steps` to speed up generation (default 50; 10–20 still gives reasonable quality).
 
+## Training
+
+FrameCrafter is trained as a LoRA adapter (rank 32, `q,k,v,o,ffn.0,ffn.2`)
+on top of the Wan2.1-I2V-14B backbone, with a small input-channel patch
+that injects per-frame Plucker raymaps. The released checkpoint follows a
+three-stage curriculum on [DL3DV-10K](https://github.com/DL3DV-10K/Dataset)
+(960P, 1K-scene subset):
+
+| Stage | Script | Resolution | Frames (M→N) | Epochs | Resume from |
+| --- | --- | --- | --- | --- | --- |
+| 1. Low-res pretraining | `model_training/train_192_336_6to1.sh`  | 192×336 | 6 → 1 (fixed)         | 160 | — (from-scratch LoRA) |
+| 2. Full-res 6-to-1     | `model_training/train_480_832_6to1.sh`  | 480×832 | 6 → 1 (fixed)         | 60  | stage 1 |
+| 3. Full-res mixed M-to-N | `model_training/train_480_832_mixed.sh` | 480×832 | random M∈[3,9], N=10−M | 30  | stage 2 |
+
+Stage 3 is what teaches the model to handle variable input view counts at
+inference time. To resume across stages, uncomment the `--resume_checkpoint`
+line at the bottom of the next stage's script.
+
+### Dataset layout
+
+Each scene must be a directory in DL3DV-10K-960P format:
+
+```
+<dataset_base_path>/
+├── <scene_a>/
+│   ├── images_4/             # RGB frames, sorted alphabetically
+│   └── transforms.json       # nerfstudio-style intrinsics + per-frame
+│                             # c2w transform_matrix (OpenGL convention)
+└── <scene_b>/
+    └── ...
+```
+
+By default the scripts point at `../DL3DV-10K_960P/1K` -- edit
+`--dataset_base_path` / `--dataset_metadata_path` in each script to match
+your layout.
+
+### Hardware & multi-GPU
+
+All three stages launch via `accelerate` over 8 processes (bf16). Stage 1
+(192×336) fits on 8× 48 GB GPUs (e.g. A6000s) thanks to DeepSpeed
+ZeRO-2, configured via the bundled `model_training/my_config.yaml`. The
+480×832 stages (2 and 3) require 8× 80 GB GPUs (e.g. H100s)
+and run with vanilla `accelerate launch` -- no ZeRO sharding needed.
+Adjust `num_processes` in `my_config.yaml` (or via `accelerate config`)
+to match your node, and tune `--gradient_accumulation_steps` to keep the
+effective batch size constant on smaller setups. Wan2.1-I2V-14B backbone
+weights download automatically to `./models/` on first run (see
+[Backbone Weights](#backbone-weights) to relocate or switch source).
+Logs stream to wandb under project `framecrafter`; export
+`WANDB_MODE=offline` to disable network logging.
+
+### Launching a stage
+
+```bash
+bash model_training/train_192_336_6to1.sh
+# then, after stage 1 finishes:
+bash model_training/train_480_832_6to1.sh
+# then, after stage 2:
+bash model_training/train_480_832_mixed.sh
+```
+
+LoRA checkpoints are written to `./models/train/framecrafter-<stage>/`.
+The exported `.safetensors` files are drop-in compatible with the
+`FrameCrafter(...)` loader used for inference.
+
 ## File Structure
 
 ```
@@ -185,7 +256,8 @@ FrameCrafter/
 ├── infer.py              # CLI for inference
 ├── demo.py               # Demo script for bundled examples
 ├── camera_utils.py       # Plucker ray computation & pose normalisation
-├── diffsynth/            # Core diffusion library
+├── diffsynth/            # Core diffusion library (incl. training utilities)
+├── model_training/       # LoRA training entry point + three-stage scripts
 ├── examples/             # Bundled demo scenes (inputs + poses)
 ├── prepare/              # Scripts for downloading checkpoints
 ├── pyproject.toml        # Package config (pip install -e .)

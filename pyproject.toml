@@ -27,6 +27,8 @@ dependencies = [
     "datasets",
     "opencv-python",
     "gdown",
+    "wandb",
+    "deepspeed",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
