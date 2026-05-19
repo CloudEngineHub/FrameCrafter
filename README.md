@@ -13,8 +13,7 @@ Carnegie Mellon University
 
 ## News
 
-- **[2026-05]** Training code released. See [Training](#training) for the
-  three-stage LoRA recipe used to produce the released checkpoint.
+- **[2026-05]** Training code released. See [Training](#training) for the LoRA recipe used to produce the released checkpoint.
 - **[2026-04]** Inference code released.
 
 ## Overview
@@ -186,20 +185,30 @@ Intrinsics are automatically scaled based on the input image dimensions.
 ## Training
 
 FrameCrafter is trained as a LoRA adapter (rank 32, `q,k,v,o,ffn.0,ffn.2`)
-on top of the Wan2.1-I2V-14B backbone, with a small input-channel patch
-that injects per-frame Plucker raymaps. The released checkpoint follows a
-three-stage curriculum on [DL3DV-10K](https://github.com/DL3DV-10K/Dataset)
-(960P, 1K-scene subset):
+on top of the Wan2.1-I2V-14B backbone. Training is done on
+[DL3DV-10K](https://github.com/DL3DV-10K/Dataset) (960P, 1K-scene subset).
 
-| Stage | Script | Resolution | Frames (M→N) | Epochs | Resume from |
-| --- | --- | --- | --- | --- | --- |
-| 1. Low-res pretraining | `model_training/train_192_336_6to1.sh`  | 192×336 | 6 → 1 (fixed)         | 160 | — (from-scratch LoRA) |
-| 2. Full-res 6-to-1     | `model_training/train_480_832_6to1.sh`  | 480×832 | 6 → 1 (fixed)         | 60  | stage 1 |
-| 3. Full-res mixed M-to-N | `model_training/train_480_832_mixed.sh` | 480×832 | random M∈[3,9], N=10−M | 30  | stage 2 |
+```bash
+# 1. Train at 192x336 (fixed 6-input -> 1-target views)
+bash model_training/train_192_336_6to1.sh
 
-Stage 3 is what teaches the model to handle variable input/output view counts at
-inference time. To resume across stages, uncomment the `--resume_checkpoint`
-line at the bottom of the next stage's script.
+# 2. Train at 480x832 (same 6-to-1 split, full inference resolution).
+#    Uncomment the --resume_checkpoint line in the script to start from previous ckpt.
+bash model_training/train_480_832_6to1.sh
+```
+
+LoRA weights are written to `./models/train/framecrafter-<run_name>/` as
+`.safetensors`, drop-in compatible with the `FrameCrafter(...)` loader
+used for inference.
+
+**Optional -- mixed M-to-N training.** For better generalization to
+variable input/output view counts at inference time, optionally continue
+fine-tuning with a randomized input/target split
+(`M ∈ [3, 9]`, `N = 10 − M`):
+
+```bash
+bash model_training/train_480_832_mixed.sh
+```
 
 ### Dataset layout
 
@@ -221,32 +230,18 @@ your layout.
 
 ### Hardware & multi-GPU
 
-All three stages launch via `accelerate` over 8 processes (bf16). Stage 1
-(192×336) fits on 8× 48 GB GPUs (e.g. A6000s) thanks to DeepSpeed
-ZeRO-2, configured via the bundled `model_training/my_config.yaml`. The
-480×832 stages (2 and 3) require 8× 80 GB GPUs (e.g. H100s)
-and run with vanilla `accelerate launch` -- no ZeRO sharding needed.
-Adjust `num_processes` in `my_config.yaml` (or via `accelerate config`)
-to match your node, and tune `--gradient_accumulation_steps` to keep the
-effective batch size constant on smaller setups. Wan2.1-I2V-14B backbone
-weights download automatically to `./models/` on first run (see
+All scripts launch via `accelerate` over 8 processes (bf16). The 192×336
+run fits on 8× 48 GB GPUs (e.g. A6000s) thanks to DeepSpeed ZeRO-2,
+configured via the bundled `model_training/my_config.yaml`. The 480×832
+runs require 8× 80 GB GPUs (e.g. H100s) and use vanilla
+`accelerate launch` -- no ZeRO sharding needed. Adjust `num_processes`
+in `my_config.yaml` (or via `accelerate config`) to match your node, and
+tune `--gradient_accumulation_steps` to keep the effective batch size
+constant on smaller setups. Wan2.1-I2V-14B backbone weights download
+automatically to `./models/` on first run (see
 [Backbone Weights](#backbone-weights) to relocate or switch source).
 Logs stream to wandb under project `framecrafter`; export
 `WANDB_MODE=offline` to disable network logging.
-
-### Launching a stage
-
-```bash
-bash model_training/train_192_336_6to1.sh
-# then, after stage 1 finishes:
-bash model_training/train_480_832_6to1.sh
-# then, after stage 2:
-bash model_training/train_480_832_mixed.sh
-```
-
-LoRA checkpoints are written to `./models/train/framecrafter-<stage>/`.
-The exported `.safetensors` files are drop-in compatible with the
-`FrameCrafter(...)` loader used for inference.
 
 ## File Structure
 
