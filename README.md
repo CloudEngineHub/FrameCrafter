@@ -197,7 +197,7 @@ three-stage curriculum on [DL3DV-10K](https://github.com/DL3DV-10K/Dataset)
 | 2. Full-res 6-to-1     | `model_training/train_480_832_6to1.sh`  | 480×832 | 6 → 1 (fixed)         | 60  | stage 1 |
 | 3. Full-res mixed M-to-N | `model_training/train_480_832_mixed.sh` | 480×832 | random M∈[3,9], N=10−M | 30  | stage 2 |
 
-Stage 3 is what teaches the model to handle variable input view counts at
+Stage 3 is what teaches the model to handle variable input/output view counts at
 inference time. To resume across stages, uncomment the `--resume_checkpoint`
 line at the bottom of the next stage's script.
 
