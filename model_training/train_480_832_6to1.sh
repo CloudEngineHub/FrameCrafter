@@ -6,10 +6,13 @@
 # resolution. Typically run as a second stage after the low-resolution
 # pretraining; supply the low-res checkpoint via --resume_checkpoint
 # (see the commented line at the bottom of this file).
+#
+# Hardware: 8x 80GB GPUs (e.g. H100s). Runs with vanilla
+# `accelerate launch` -- no DeepSpeed config needed at this VRAM budget.
 
-accelerate launch --config_file model_training/my_config.yaml model_training/train.py \
-  --dataset_base_path ../../../DL3DV-10K_960P/1K \
-  --dataset_metadata_path ../../../DL3DV-10K_960P/1K \
+accelerate launch model_training/train.py \
+  --dataset_base_path ../DL3DV-10K_960P/1K \
+  --dataset_metadata_path ../DL3DV-10K_960P/1K \
   --height 480 \
   --width 832 \
   --num_frames 7 \

@@ -9,8 +9,11 @@
 # stage teaches the model to handle a variable number of input views.
 # Typically run after the fixed-split stages; supply the previous checkpoint
 # via --resume_checkpoint (see the commented line at the bottom of this file).
+#
+# Hardware: 8x 80GB GPUs (e.g. H100s). Runs with vanilla
+# `accelerate launch` -- no DeepSpeed config needed at this VRAM budget.
 
-accelerate launch --config_file model_training/my_config.yaml model_training/train.py \
+accelerate launch model_training/train.py \
   --dataset_base_path ../DL3DV-10K_960P/1K \
   --dataset_metadata_path ../DL3DV-10K_960P/1K \
   --height 480 \
@@ -18,7 +21,7 @@ accelerate launch --config_file model_training/my_config.yaml model_training/tra
   --num_frames 10 \
   --dataset_repeat 1 \
   --model_id_with_origin_paths "Wan-AI/Wan2.1-I2V-14B-480P:diffusion_pytorch_model*.safetensors,Wan-AI/Wan2.1-I2V-14B-480P:models_t5_umt5-xxl-enc-bf16.pth,Wan-AI/Wan2.1-I2V-14B-480P:Wan2.1_VAE.pth,Wan-AI/Wan2.1-I2V-14B-480P:models_clip_open-clip-xlm-roberta-large-vit-huge-14.pth" \
-  --learning_rate 1e-4 \
+  --learning_rate 5e-5 \
   --num_epochs 30 \
   --remove_prefix_in_ckpt "pipe.dit." \
   --output_path "./models/train/framecrafter-480_832_mixed" \
@@ -28,7 +31,7 @@ accelerate launch --config_file model_training/my_config.yaml model_training/tra
   --extra_inputs "input_image" \
   --modify_channels \
   --new_in_dim 420 \
-  --gradient_accumulation_steps 1 \
+  --gradient_accumulation_steps 2 \
   --initialize_model_on_cpu \
   --individual_encoding \
   --sampling_strategy "prob_random" \

@@ -6,6 +6,9 @@
 # as a first stage before fine-tuning at full resolution
 # (train_480_832_6to1.sh) and, optionally, with variable M-to-N
 # (train_480_832_mixed.sh).
+#
+# Hardware: 8x 48GB GPUs (e.g. A6000s) via DeepSpeed ZeRO-2
+# (see model_training/my_config.yaml).
 
 accelerate launch --config_file model_training/my_config.yaml model_training/train.py \
   --dataset_base_path ../DL3DV-10K_960P/1K \
