@@ -13,6 +13,7 @@ Carnegie Mellon University
 
 ## News
 
+- **[2026-06]** FrameCrafter is accepted to ECCV 2026! 🎉
 - **[2026-05]** Training code released. See [Training](#training) for the LoRA recipe used to produce the released checkpoint.
 - **[2026-04]** Inference code released.
 
