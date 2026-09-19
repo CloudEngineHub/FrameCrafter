@@ -273,10 +273,12 @@ We thank the authors of [DiffSynth-Studio](https://github.com/modelscope/DiffSyn
 If you find this work useful, please consider citing:
 
 ```bibtex
-@article{Wu2026framecrafter,
-  title={Novel View Synthesis as Video Completion},
-  author={Qi Wu and Khiem Vuong and Minsik Jeon and Srinivasa Narasimhan and Deva Ramanan},
+@inproceedings{wu2026framecrafter,
+  title={FrameCrafter: Novel View Synthesis as Video Completion},
+  author={Wu, Qi and Vuong, Khiem and Jeon, Minsik and Narasimhan, Srinivasa and Ramanan, Deva},
+  booktitle={European Conference on Computer Vision},
+  pages={73--91},
   year={2026},
-  journal={arXiv preprint arXiv:2604.08500},
+  organization={Springer}
 }
 ```
